@@ -1,12 +1,12 @@
 extern crate futures;
 extern crate tokio_core;
 extern crate tokio_stdin;
-extern crate stream_sequence;
+extern crate stream_combinators;
 
 use futures::stream::Stream;
 use tokio_core::reactor::Core;
 use tokio_stdin::spawn_stdin_stream_unbounded;
-use stream_sequence::Sequence;
+use stream_combinators::SequenceStream;
 
 fn main() {
     let mut core = Core::new().unwrap();
@@ -18,7 +18,7 @@ fn main() {
         });
 
     // Afterwards, map the resulting stream to print the bytes we read
-    let prog = Sequence::new(stdin, |input| {
+    let prog = stdin.sequence(|input| {
         input.map(|byte| println!("{:?}", byte))
     }).for_each(|_| Ok(()));
 
