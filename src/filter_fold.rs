@@ -14,31 +14,29 @@ use core::mem;
 
 pub struct FilterFold<S, F, A, U>
     where S: Stream,
-          F: FnMut(&mut A, Option<S::Item>) -> (A, Option<U>)
+          F: FnMut(A, Option<S::Item>) -> (A, Option<U>)
 {
     stream: S,
     f: F,
-    acc: A,
-    done: bool,
+    acc: Option<A>,
 }
 
 impl<S, F, A, U> FilterFold<S, F, A, U>
     where S: Stream,
-          F: FnMut(&mut A, Option<S::Item>) -> (A, Option<U>)
+          F: FnMut(A, Option<S::Item>) -> (A, Option<U>)
 {
     pub fn new(stream: S, f: F, acc: A) -> FilterFold<S, F, A, U> {
         FilterFold {
             stream: stream,
             f: f,
-            acc: acc,
-            done: false,
+            acc: Some(acc),
         }
     }
 }
 
 pub trait FilterFoldStream: Stream + Sized {
     fn filter_fold<F, A, U>(self, f: F, acc: A) -> FilterFold<Self, F, A, U>
-          where F: FnMut(&mut A, Option<Self::Item>) -> (A, Option<U>)
+          where F: FnMut(A, Option<Self::Item>) -> (A, Option<U>)
     {
         FilterFold::new(self, f, acc)
     }
@@ -50,7 +48,7 @@ impl<S> FilterFoldStream for S
 
 impl<S, F, A, U> Stream for FilterFold<S, F, A, U>
     where S: Stream,
-          F: FnMut(&mut A, Option<S::Item>) -> (A, Option<U>),
+          F: FnMut(A, Option<S::Item>) -> (A, Option<U>),
           S::Item: Debug, A: Debug, U: Debug
 {
     type Item = U;
@@ -60,24 +58,39 @@ impl<S, F, A, U> Stream for FilterFold<S, F, A, U>
         println!("Polling filterfold");
 
         loop {
-            if self.done {
-                println!("Done");
-                return Ok(Async::Ready(None))
-            } else {
-                match self.stream.poll()? {
-                    Async::Ready(elem) => {
-                        println!("Got something: {:?}", elem);
-                        self.done = elem.is_none();
+            match self.acc.take() {
+                None => {
+                    println!("Done");
+                    return Ok(Async::Ready(None))
+                },
+                Some(acc) => {
+                    match self.stream.poll()? {
+                        Async::Ready(None) => {
+                            println!("Got EOS");
 
-                        let (acc, res) = (self.f)(&mut self.acc, elem);
-                        self.acc = acc;
-                        println!("acc: {:?}, res: {:?}", self.acc, res);
+                            let (_, res) = (self.f)(acc, None);
+                            println!("acc: {:?}, res: {:?}", self.acc, res);
 
-                        if let Some(fold_elem) = res {
-                            return Ok(Async::Ready(Some(fold_elem)))
+                            if let Some(fold_elem) = res {
+                                return Ok(Async::Ready(Some(fold_elem)))
+                            }
+                        },
+                        Async::Ready(Some(elem)) => {
+                            println!("Got something: {:?}", elem);
+
+                            let (acc, res) = (self.f)(acc, Some(elem));
+                            self.acc = Some(acc);
+                            println!("acc: {:?}, res: {:?}", self.acc, res);
+
+                            if let Some(fold_elem) = res {
+                                return Ok(Async::Ready(Some(fold_elem)))
+                            }
+                        },
+                        Async::NotReady => {
+                            self.acc = Some(acc);
+                            return Ok(Async::NotReady)
                         }
-                    },
-                    Async::NotReady => return Ok(Async::NotReady),
+                    }
                 }
             }
         }

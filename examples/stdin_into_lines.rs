@@ -13,29 +13,29 @@ fn main() {
 
     // Print stdin line-by-line
     let prog = spawn_stdin_stream_unbounded()
-        .filter_fold(|buf, elem| {
+        .filter_fold(|mut buf, elem| {
             match elem {
                 // Got a newline
                 Some(byte) if byte == '\n' as u8 => {
-                    let s = String::from_utf8(buf.to_vec()).unwrap();
+                    let s = String::from_utf8(buf).unwrap();
                     println!("debug stdin: {}", s);
                     (vec![], Some(s))
                 },
                 // Got a byte
                 Some(byte) => {
                     buf.push(byte);
-                    (buf.to_vec(), None)
+                    (buf, None)
                 },
                 // Got EOF
                 None => {
                     if buf.len() > 0 {
-                        let s = String::from_utf8(buf.to_vec()).unwrap();
+                        let s = String::from_utf8(buf).unwrap();
                         println!("debug stdin is done: {}", s);
                         (vec![], Some(s))
                     }
                     else {
                         println!("debug stdin is done; no line");
-                        (buf.to_vec(), None)
+                        (buf, None)
                     }
                 }
             }
