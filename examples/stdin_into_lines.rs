@@ -3,7 +3,7 @@ extern crate tokio_core;
 extern crate tokio_stdin;
 extern crate stream_combinators;
 
-use futures::stream::Stream;
+use futures::stream::{once, Stream};
 use tokio_core::reactor::Core;
 use tokio_stdin::spawn_stdin_stream_unbounded;
 use stream_combinators::FilterFoldStream;
@@ -13,33 +13,22 @@ fn main() {
 
     // Print stdin line-by-line
     let prog = spawn_stdin_stream_unbounded()
-        .filter_fold(|mut buf, elem| {
-            match elem {
-                // Got a newline
-                Some(byte) if byte == '\n' as u8 => {
-                    let s = String::from_utf8(buf).unwrap();
-                    println!("debug stdin: {}", s);
-                    (vec![], Some(s))
-                },
-                // Got a byte
-                Some(byte) => {
-                    buf.push(byte);
-                    (buf, None)
-                },
-                // Got EOF
-                None => {
-                    if buf.len() > 0 {
-                        let s = String::from_utf8(buf).unwrap();
-                        println!("debug stdin is done: {}", s);
-                        (vec![], Some(s))
-                    }
-                    else {
-                        println!("debug stdin is done; no line");
-                        (buf, None)
-                    }
-                }
+        // Include an extra newline in case the input is missing a trailing newline
+        // Note: this will print a spurious blank line in the case the input has
+        // a trailing newline; see
+        // https://github.com/paulkernfeld/tokio-stdin/blob/master/examples/count_keys.rs
+        // for a way to prevent that situation, if it matters.
+        .chain(once(Ok('\n' as u8)))
+        // Accumulate bytes into lines
+        .filter_fold(vec![], |mut buf, byte| {
+            if byte == ('\n' as u8) {
+                let s = String::from_utf8(buf).unwrap();
+                Ok((vec![], Some(s)))
+            } else {
+                buf.push(byte);
+                Ok((buf, None))
             }
-        }, vec![])
+        })
         .for_each(|line| {
             println!("{}", line);
             Ok(())
