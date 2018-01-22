@@ -15,8 +15,7 @@ fn main() {
     let prog = spawn_stdin_stream_unbounded()
         // Include an extra newline in case the input is missing a trailing newline
         // Note: this will print a spurious blank line in the case the input has
-        // a trailing newline; see
-        // https://github.com/paulkernfeld/tokio-stdin/blob/master/examples/count_keys.rs
+        // a trailing newline; see `examples/fancier_stdin_into_lines.rs`
         // for a way to prevent that situation, if it matters.
         .chain(once(Ok('\n' as u8)))
         // Accumulate bytes into lines
