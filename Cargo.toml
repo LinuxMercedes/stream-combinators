@@ -3,6 +3,15 @@ name = "stream-combinators"
 version = "0.0.0"
 authors = ["LinuxMercedes <LinuxMercedes@gmail.com>"]
 license = "MIT/Apache-2.0"
+readme = "README.md"
+keywords = ["futures", "async", "future"]
+repository = "https://github.com/LinuxMercedes/stream-combinators"
+homepage = "https://github.com/LinuxMercedes/stream-combinators"
+description = """
+Additional stream combinators for [`futures-rs`](https://github.com/alexcrichton/futures-rs/) streams.
+"""
+categories = ["asynchronous"]
+
 
 [dependencies]
 futures = "0.1"
