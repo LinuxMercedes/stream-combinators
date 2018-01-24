@@ -1,6 +1,6 @@
 [package]
 name = "stream-combinators"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["LinuxMercedes <LinuxMercedes@gmail.com>"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
@@ -18,5 +18,5 @@ futures = "0.1"
 
 [dev-dependencies]
 tokio-core = "0.1"
-tokio-stdin = "*"
-tokio-timer = "*"
+tokio-stdin = "0.1"
+tokio-timer = "0.1"
