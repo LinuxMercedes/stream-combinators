@@ -9,3 +9,4 @@ futures = "0.1"
 [dev-dependencies]
 tokio-core = "0.1"
 tokio-stdin = "*"
+tokio-timer = "*"
