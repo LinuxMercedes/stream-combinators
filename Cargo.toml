@@ -2,6 +2,7 @@
 name = "stream-combinators"
 version = "0.0.0"
 authors = ["LinuxMercedes <LinuxMercedes@gmail.com>"]
+license = "MIT/Apache-2.0"
 
 [dependencies]
 futures = "0.1"
