@@ -26,21 +26,21 @@ fn main() {
     let mut bytes = 0;
     let mut seconds = 0;
 
+    // Map our input into Byte events and indicate when we hit EOF
+    let stdin = stdin.map(|_| Event::Byte)
+        .map_err(|_| ())
+        .chain(once(Ok(Event::Done)));
+    // Map our timer into Second events
+    let timer = Timer::default()
+        .interval(Duration::from_secs(1))
+        .map(|_| Event::Second)
+        .map_err(|_| ());
+
     // Afterwards, count the bytes received per second;
     // without `.sequence`, the timer would start counting before the first
     // newline arrived.
-    let prog = stdin.sequence(|input| {
-            // Map our input into Byte events and indicate when we hit EOF
-            let input = input.map(|_| Event::Byte)
-                .map_err(|_| ())
-                .chain(once(Ok(Event::Done)));
-            // Map our timer into Second events
-            let timer = Timer::default()
-                .interval(Duration::from_secs(1))
-                .map(|_| Event::Second)
-                .map_err(|_| ());
-
-            input.select(timer).and_then(|event| {
+    let prog = stdin.sequence(|stdin| {
+            stdin.select(timer).and_then(|event| {
                 match event {
                     Event::Byte => {
                         bytes += 1;
