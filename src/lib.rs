@@ -1,5 +1,5 @@
-extern crate futures;
 extern crate core;
+extern crate futures;
 
 pub mod filter_fold;
 pub use filter_fold::FilterFoldStream;

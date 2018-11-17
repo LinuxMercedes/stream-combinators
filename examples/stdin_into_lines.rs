@@ -1,16 +1,13 @@
 extern crate futures;
-extern crate tokio_core;
-extern crate tokio_stdin;
 extern crate stream_combinators;
+extern crate tokio;
+extern crate tokio_stdin;
 
 use futures::stream::{once, Stream};
-use tokio_core::reactor::Core;
-use tokio_stdin::spawn_stdin_stream_unbounded;
 use stream_combinators::FilterFoldStream;
+use tokio_stdin::spawn_stdin_stream_unbounded;
 
 fn main() {
-    let mut core = Core::new().unwrap();
-
     // Print stdin line-by-line
     let prog = spawn_stdin_stream_unbounded()
         // Include an extra newline in case the input is missing a trailing newline
@@ -27,12 +24,10 @@ fn main() {
                 buf.push(byte);
                 Ok((buf, None))
             }
-        })
-        .for_each(|line| {
+        }).for_each(|line| {
             println!("{}", line);
             Ok(())
         });
 
-
-    core.run(prog).unwrap()
+    tokio::run(prog)
 }
