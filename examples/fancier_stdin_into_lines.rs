@@ -16,27 +16,24 @@ fn main() {
         .map(Some)
         .chain(once(Ok(None)))
         // Accumulate bytes into lines
-        .filter_fold(vec![], |mut buf, val| {
-            match val {
-                Some(NEWLINE) => {
+        .filter_fold(vec![], |mut buf, val| match val {
+            Some(NEWLINE) => {
+                let s = String::from_utf8(buf).unwrap();
+                Ok((vec![], Some(s)))
+            }
+            Some(byte) => {
+                buf.push(byte);
+                Ok((buf, None))
+            }
+            None => {
+                if buf.len() > 0 {
                     let s = String::from_utf8(buf).unwrap();
                     Ok((vec![], Some(s)))
-                },
-                Some(byte) => {
-                    buf.push(byte);
+                } else {
                     Ok((buf, None))
-                },
-                None => {
-                    if buf.len() > 0 {
-                        let s = String::from_utf8(buf).unwrap();
-                        Ok((vec![], Some(s)))
-                    } else {
-                        Ok((buf, None))
-                    }
                 }
             }
-        })
-        .for_each(|line| {
+        }).for_each(|line| {
             println!("{}", line);
             Ok(())
         });

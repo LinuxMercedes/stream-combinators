@@ -1,6 +1,6 @@
-use futures::{Poll, Async, Future};
-use futures::stream::{Stream, Chain, StreamFuture, Once, once};
 use core::mem;
+use futures::stream::{once, Chain, Once, Stream, StreamFuture};
+use futures::{Async, Future, Poll};
 
 /// Drives a stream until just before it produces a value,
 /// then performs a transformation on the stream and returns
@@ -18,7 +18,8 @@ use core::mem;
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Sequence<S, F, U>
-    where S: Stream
+where
+    S: Stream,
 {
     state: SeqState<S, F, U>,
 }
@@ -29,7 +30,8 @@ type OutputStream<S> = Chain<Once<<S as Stream>::Item, <S as Stream>::Error>, S>
 
 #[derive(Debug)]
 enum SeqState<S, F, U>
-    where S: Stream
+where
+    S: Stream,
 {
     /// Wrapped stream is done
     Done,
@@ -40,12 +42,15 @@ enum SeqState<S, F, U>
 }
 
 impl<S, F, U> Sequence<S, F, U>
-    where S: Stream,
-          F: FnOnce(OutputStream<S>) -> U,
-          U: Stream
+where
+    S: Stream,
+    F: FnOnce(OutputStream<S>) -> U,
+    U: Stream,
 {
     pub fn new(stream: S, f: F) -> Sequence<S, F, U> {
-        Sequence { state: SeqState::Waiting((stream.into_future(), f)) }
+        Sequence {
+            state: SeqState::Waiting((stream.into_future(), f)),
+        }
     }
 
     fn poll_stream(&mut self, mut stream: U) -> Poll<Option<U::Item>, U::Error> {
@@ -61,8 +66,9 @@ pub trait SequenceStream: Stream + Sized {
     /// Takes a transformation function which will be applied to
     /// the stream immediately before it produces a value.
     fn sequence<F, U>(self, f: F) -> Sequence<Self, F, U>
-        where F: FnOnce(OutputStream<Self>) -> U,
-              U: Stream
+    where
+        F: FnOnce(OutputStream<Self>) -> U,
+        U: Stream,
     {
         Sequence::new(self, f)
     }
@@ -72,9 +78,10 @@ pub trait SequenceStream: Stream + Sized {
 impl<S> SequenceStream for S where S: Stream {}
 
 impl<S, F, U> Stream for Sequence<S, F, U>
-    where S: Stream,
-          F: FnOnce(OutputStream<S>) -> U,
-          U: Stream
+where
+    S: Stream,
+    F: FnOnce(OutputStream<S>) -> U,
+    U: Stream,
 {
     type Item = U::Item;
     type Error = U::Error;
@@ -82,28 +89,26 @@ impl<S, F, U> Stream for Sequence<S, F, U>
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match mem::replace(&mut self.state, SeqState::Done) {
             SeqState::Done => Ok(Async::Ready(None)),
-            SeqState::Waiting((mut stream_future, f)) => {
-                match stream_future.poll() {
-                    Ok(Async::Ready((Some(val), stream))) => {
-                        let stream = once(Ok(val)).chain(stream);
-                        let stream = f(stream);
-                        self.poll_stream(stream)
-                    }
-                    Err((err, stream)) => {
-                        let stream = once(Err(err)).chain(stream);
-                        let stream = f(stream);
-                        self.poll_stream(stream)
-                    }
-                    Ok(Async::NotReady) => {
-                        self.state = SeqState::Waiting((stream_future, f));
-                        Ok(Async::NotReady)
-                    }
-                    Ok(Async::Ready((None, _stream))) => {
-                        self.state = SeqState::Done;
-                        Ok(Async::Ready(None))
-                    }
+            SeqState::Waiting((mut stream_future, f)) => match stream_future.poll() {
+                Ok(Async::Ready((Some(val), stream))) => {
+                    let stream = once(Ok(val)).chain(stream);
+                    let stream = f(stream);
+                    self.poll_stream(stream)
                 }
-            }
+                Err((err, stream)) => {
+                    let stream = once(Err(err)).chain(stream);
+                    let stream = f(stream);
+                    self.poll_stream(stream)
+                }
+                Ok(Async::NotReady) => {
+                    self.state = SeqState::Waiting((stream_future, f));
+                    Ok(Async::NotReady)
+                }
+                Ok(Async::Ready((None, _stream))) => {
+                    self.state = SeqState::Done;
+                    Ok(Async::Ready(None))
+                }
+            },
             SeqState::Streaming(stream) => self.poll_stream(stream),
         }
     }

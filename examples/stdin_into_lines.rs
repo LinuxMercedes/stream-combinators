@@ -24,8 +24,7 @@ fn main() {
                 buf.push(byte);
                 Ok((buf, None))
             }
-        })
-        .for_each(|line| {
+        }).for_each(|line| {
             println!("{}", line);
             Ok(())
         });

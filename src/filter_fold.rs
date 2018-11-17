@@ -1,6 +1,6 @@
-use futures::{Poll, Async, Future, IntoFuture};
-use futures::stream::Stream;
 use core::mem;
+use futures::stream::Stream;
+use futures::{Async, Future, IntoFuture, Poll};
 
 /// Execute an accumulating computation over a stream,
 /// collecting values into a stream of computation results.
@@ -39,9 +39,10 @@ use core::mem;
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct FilterFold<S, F, A, Fut>
-    where S: Stream,
-          F: FnMut(A, S::Item) -> Fut,
-          Fut: IntoFuture,
+where
+    S: Stream,
+    F: FnMut(A, S::Item) -> Fut,
+    Fut: IntoFuture,
 {
     stream: S,
     f: F,
@@ -50,7 +51,8 @@ pub struct FilterFold<S, F, A, Fut>
 
 #[derive(Debug)]
 enum State<A, Fut>
-    where Fut: Future
+where
+    Fut: Future,
 {
     /// Placeholder when doing work
     Empty,
@@ -61,10 +63,11 @@ enum State<A, Fut>
 }
 
 impl<S, F, A, Fut, U> FilterFold<S, F, A, Fut>
-    where S: Stream,
-          S::Error: From<Fut::Error>,
-          F: FnMut(A, S::Item) -> Fut,
-          Fut: IntoFuture<Item = (A, Option<U>)>,
+where
+    S: Stream,
+    S::Error: From<Fut::Error>,
+    F: FnMut(A, S::Item) -> Fut,
+    Fut: IntoFuture<Item = (A, Option<U>)>,
 {
     pub fn new(stream: S, acc: A, f: F) -> FilterFold<S, F, A, Fut> {
         FilterFold {
@@ -85,24 +88,24 @@ pub trait FilterFoldStream: Stream + Sized {
     /// and the second item is an `Option`. The `FilterFold` stream contains
     /// the values that are `Some`.
     fn filter_fold<F, A, Fut, U>(self, acc: A, f: F) -> FilterFold<Self, F, A, Fut>
-        where Self::Error: From<Fut::Error>,
-              F: FnMut(A, Self::Item) -> Fut,
-              Fut: IntoFuture<Item = (A, Option<U>)>,
+    where
+        Self::Error: From<Fut::Error>,
+        F: FnMut(A, Self::Item) -> Fut,
+        Fut: IntoFuture<Item = (A, Option<U>)>,
     {
         FilterFold::new(self, acc, f)
     }
 }
 
 /// Implement `filter_fold` for all `Stream`s
-impl<S> FilterFoldStream for S
-    where S: Stream
-{ }
+impl<S> FilterFoldStream for S where S: Stream {}
 
 impl<S, F, A, Fut, U> Stream for FilterFold<S, F, A, Fut>
-    where S: Stream,
-          S::Error: From<Fut::Error>,
-          F: FnMut(A, S::Item) -> Fut,
-          Fut: IntoFuture<Item = (A, Option<U>)>
+where
+    S: Stream,
+    S::Error: From<Fut::Error>,
+    F: FnMut(A, S::Item) -> Fut,
+    Fut: IntoFuture<Item = (A, Option<U>)>,
 {
     type Item = U;
     type Error = S::Error;
@@ -110,32 +113,35 @@ impl<S, F, A, Fut, U> Stream for FilterFold<S, F, A, Fut>
     // Inspiration/code borrowed from:
     // https://github.com/alexcrichton/futures-rs/blob/master/src/stream/fold.rs
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop { // I dream of explicit tail call optimization...
+        loop {
+            // I dream of explicit tail call optimization...
             match mem::replace(&mut self.state, State::Empty) {
                 State::Empty => panic!("cannot poll FilterFold twice"),
-                State::Ready(acc) => { // Ready; get next stream item
+                State::Ready(acc) => {
+                    // Ready; get next stream item
                     match self.stream.poll()? {
                         Async::Ready(None) => {
                             return Ok(Async::Ready(None));
-                        },
+                        }
                         Async::Ready(Some(elem)) => {
                             let future = (self.f)(acc, elem);
                             let future = future.into_future();
                             self.state = State::Processing(future);
                             // loop around and start processing the future
-                        },
+                        }
                         Async::NotReady => {
                             self.state = State::Ready(acc);
                             return Ok(Async::NotReady);
                         }
                     }
-                },
-                State::Processing(mut future) => { // Busy; get a result from the future
+                }
+                State::Processing(mut future) => {
+                    // Busy; get a result from the future
                     match future.poll()? {
                         Async::Ready((acc, res)) => {
                             self.state = State::Ready(acc);
                             if let Some(fold_elem) = res {
-                                return Ok(Async::Ready(Some(fold_elem)))
+                                return Ok(Async::Ready(Some(fold_elem)));
                             }
                             // Otherwise loop around and start processing the next item
                         }
